@@ -6,10 +6,9 @@ import (
 	"log"
 	"net"
 
-	"google.golang.org/grpc/reflection"
-
 	pb "github.com/marceloaguero/shipper/vessel-service/proto/vessel"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 const (
@@ -70,17 +69,4 @@ func main() {
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
-	/*	srv := micro.NewService(
-			micro.Name("go.micro.srv.vessel"),
-			micro.Version("latest"),
-		)
-
-		srv.Init()
-
-		// Register our implementation with
-		pb.RegisterVesselServiceHandler(srv.Server(), &service{repo})
-
-		if err := srv.Run(); err != nil {
-			fmt.Println(err)
-		}	*/
 }
