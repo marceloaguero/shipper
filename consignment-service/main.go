@@ -1,20 +1,15 @@
 package main
 
 import (
-	"context"
-	"log"
-	"net"
 
 	// Import the generated protobuf code
+	"fmt"
+	"log"
+
 	pb "github.com/marceloaguero/shipper/consignment-service/proto/consignment"
 	vesselProto "github.com/marceloaguero/shipper/vessel-service/proto/vessel"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
-)
-
-const (
-	port          = ":50051"
-	vesselAddress = "127.0.0.1:50052"
+	micro "github.com/micro/go-micro"
+	"golang.org/x/net/context"
 )
 
 type Repository interface {
@@ -50,7 +45,7 @@ type service struct {
 // CreateConsignment - we created just one method on our service,
 // which is a create method, which takes a context and a request as an
 // argument, these are handled by the gRPC server.
-func (s *service) CreateConsignment(ctx context.Context, req *pb.Consignment) (*pb.Response, error) {
+func (s *service) CreateConsignment(ctx context.Context, req *pb.Consignment, res *pb.Response) error {
 
 	// Here we call a client instance of our vessel service with our consignment weight,
 	// and the amount of containers as the capacity value
@@ -58,59 +53,56 @@ func (s *service) CreateConsignment(ctx context.Context, req *pb.Consignment) (*
 		MaxWeight: req.Weight,
 		Capacity:  int32(len(req.Containers)),
 	})
-
-	log.Printf("Found vessel: %s, \n", vesselResponse.Vessel.Name)
+	log.Printf("Found vessel: %s \n", vesselResponse.Vessel.Name)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// We set the VesselId as the vessel we got back
-	// from our vessel service
+	// We set the VesselId as the vessel we got back from our
+	// vessel service
 	req.VesselId = vesselResponse.Vessel.Id
 
 	// Save our consignment
 	consignment, err := s.repo.Create(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Return matching the `Response` message we created in our
 	// protobuf definition.
-	return &pb.Response{Created: true, Consignment: consignment}, nil
+	res.Created = true
+	res.Consignment = consignment
+	return nil
 }
 
-func (s *service) GetConsignments(ctx context.Context, req *pb.GetRequest) (*pb.Response, error) {
+func (s *service) GetConsignments(ctx context.Context, req *pb.GetRequest, res *pb.Response) error {
 	consignments := s.repo.GetAll()
-	return &pb.Response{Consignments: consignments}, nil
+	res.Consignments = consignments
+	return nil
 }
 
 func main() {
 
 	repo := &ConsignmentRepository{}
 
-	// Connect to vessel service
-	conn, err := grpc.Dial(vesselAddress, grpc.WithInsecure())
-	if err != nil {
-		log.Fatalf("Did not connect to vessel service: %v", err)
-	}
-	defer conn.Close()
-	vesselClient := vesselProto.NewVesselServiceClient(conn)
+	// Create a new service. Optionally include some options here.
+	srv := micro.NewService(
 
-	// Set-up our gRPC server.
-	lis, err := net.Listen("tcp", port)
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-	s := grpc.NewServer()
+		// This name must match the package name given in your protobuf definition
+		micro.Name("go.micro.srv.consignment"),
+		micro.Version("latest"),
+	)
 
-	// Register our service with the gRPC server, this will tie our
-	// implementation into the auto-generated interface code for our
-	// protobuf definition.
-	pb.RegisterShippingServiceServer(s, &service{repo, vesselClient})
+	vesselClient := vesselProto.NewVesselServiceClient("go.micro.srv.vessel", srv.Client())
 
-	// Register reflection service on gRPC server.
-	reflection.Register(s)
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+	// Init will parse the command line flags.
+	srv.Init()
+
+	// Register handler
+	pb.RegisterShippingServiceHandler(srv.Server(), &service{repo, vesselClient})
+
+	// Run the server
+	if err := srv.Run(); err != nil {
+		fmt.Println(err)
 	}
 }

@@ -19,8 +19,9 @@ import fmt "fmt"
 import math "math"
 
 import (
+	client "github.com/micro/go-micro/client"
+	server "github.com/micro/go-micro/server"
 	context "golang.org/x/net/context"
-	grpc "google.golang.org/grpc"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -146,29 +147,37 @@ func init() {
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ context.Context
-var _ grpc.ClientConn
-
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion4
+var _ client.Option
+var _ server.Option
 
 // Client API for VesselService service
 
 type VesselServiceClient interface {
-	FindAvailable(ctx context.Context, in *Specification, opts ...grpc.CallOption) (*Response, error)
+	FindAvailable(ctx context.Context, in *Specification, opts ...client.CallOption) (*Response, error)
 }
 
 type vesselServiceClient struct {
-	cc *grpc.ClientConn
+	c           client.Client
+	serviceName string
 }
 
-func NewVesselServiceClient(cc *grpc.ClientConn) VesselServiceClient {
-	return &vesselServiceClient{cc}
+func NewVesselServiceClient(serviceName string, c client.Client) VesselServiceClient {
+	if c == nil {
+		c = client.NewClient()
+	}
+	if len(serviceName) == 0 {
+		serviceName = "vessel"
+	}
+	return &vesselServiceClient{
+		c:           c,
+		serviceName: serviceName,
+	}
 }
 
-func (c *vesselServiceClient) FindAvailable(ctx context.Context, in *Specification, opts ...grpc.CallOption) (*Response, error) {
+func (c *vesselServiceClient) FindAvailable(ctx context.Context, in *Specification, opts ...client.CallOption) (*Response, error) {
+	req := c.c.NewRequest(c.serviceName, "VesselService.FindAvailable", in)
 	out := new(Response)
-	err := grpc.Invoke(ctx, "/vessel.VesselService/FindAvailable", in, out, c.cc, opts...)
+	err := c.c.Call(ctx, req, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -177,43 +186,20 @@ func (c *vesselServiceClient) FindAvailable(ctx context.Context, in *Specificati
 
 // Server API for VesselService service
 
-type VesselServiceServer interface {
-	FindAvailable(context.Context, *Specification) (*Response, error)
+type VesselServiceHandler interface {
+	FindAvailable(context.Context, *Specification, *Response) error
 }
 
-func RegisterVesselServiceServer(s *grpc.Server, srv VesselServiceServer) {
-	s.RegisterService(&_VesselService_serviceDesc, srv)
+func RegisterVesselServiceHandler(s server.Server, hdlr VesselServiceHandler, opts ...server.HandlerOption) {
+	s.Handle(s.NewHandler(&VesselService{hdlr}, opts...))
 }
 
-func _VesselService_FindAvailable_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Specification)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(VesselServiceServer).FindAvailable(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/vessel.VesselService/FindAvailable",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VesselServiceServer).FindAvailable(ctx, req.(*Specification))
-	}
-	return interceptor(ctx, in, info, handler)
+type VesselService struct {
+	VesselServiceHandler
 }
 
-var _VesselService_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "vessel.VesselService",
-	HandlerType: (*VesselServiceServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "FindAvailable",
-			Handler:    _VesselService_FindAvailable_Handler,
-		},
-	},
-	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/vessel/vessel.proto",
+func (h *VesselService) FindAvailable(ctx context.Context, in *Specification, out *Response) error {
+	return h.VesselServiceHandler.FindAvailable(ctx, in, out)
 }
 
 func init() { proto.RegisterFile("proto/vessel/vessel.proto", fileDescriptor0) }

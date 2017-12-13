@@ -3,16 +3,10 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
-	"net"
+	"fmt"
 
 	pb "github.com/marceloaguero/shipper/vessel-service/proto/vessel"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
-)
-
-const (
-	port = ":50051"
+	"github.com/micro/go-micro"
 )
 
 type Repository interface {
@@ -40,15 +34,17 @@ type service struct {
 	repo Repository
 }
 
-func (s *service) FindAvailable(ctx context.Context, req *pb.Specification) (*pb.Response, error) {
+func (s *service) FindAvailable(ctx context.Context, req *pb.Specification, res *pb.Response) error {
 
 	// Find the next available vessel
 	vessel, err := s.repo.FindAvailable(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &pb.Response{Vessel: vessel}, nil
+	// Set the vessel as part of the response message type
+	res.Vessel = vessel
+	return nil
 }
 
 func main() {
@@ -57,16 +53,17 @@ func main() {
 	}
 	repo := &VesselRepository{vessels}
 
-	lis, err := net.Listen("tcp", port)
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-	s := grpc.NewServer()
+	srv := micro.NewService(
+		micro.Name("go.micro.srv.vessel"),
+		micro.Version("latest"),
+	)
 
-	pb.RegisterVesselServiceServer(s, &service{repo})
+	srv.Init()
 
-	reflection.Register(s)
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+	// Register our implementation with
+	pb.RegisterVesselServiceHandler(srv.Server(), &service{repo})
+
+	if err := srv.Run(); err != nil {
+		fmt.Println(err)
 	}
 }

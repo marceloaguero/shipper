@@ -14,7 +14,6 @@ RUN apk --no-cache add ca-certificates
 
 RUN mkdir /app
 WORKDIR /app
-
 COPY --from=builder /go/src/github.com/marceloaguero/shipper/consignment-service/consignment-service .
 
 CMD ["./consignment-service"]
