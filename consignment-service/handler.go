@@ -1,11 +1,11 @@
 package main
 
 import (
-	"context"
 	"log"
 
 	pb "github.com/marceloaguero/shipper/consignment-service/proto/consignment"
 	vesselProto "github.com/marceloaguero/shipper/vessel-service/proto/vessel"
+	"golang.org/x/net/context"
 	"gopkg.in/mgo.v2"
 )
 

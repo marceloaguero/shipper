@@ -1,9 +1,8 @@
 package main
 
 import (
-	"context"
-
 	pb "github.com/marceloaguero/shipper/vessel-service/proto/vessel"
+	"golang.org/x/net/context"
 	"gopkg.in/mgo.v2"
 )
 

@@ -5,6 +5,7 @@ import (
 	// Import the generated protobuf code
 	"fmt"
 	"log"
+
 	"os"
 
 	pb "github.com/marceloaguero/shipper/consignment-service/proto/consignment"
